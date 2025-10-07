@@ -1,15 +1,16 @@
-import { getDB } from "../lib/db";
+import { Pool } from "@neondatabase/serverless";
 
 export default async function handler(req, res) {
-  const sql = getDB();
+  const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
   try {
-    const rows = await sql`SELECT * FROM inventario ORDER BY tipo, sabor`;
-
-    // Caché HTTP
-    res.setHeader("Cache-Control", "s-maxage=10, stale-while-revalidate");
+    const { rows } = await pool.query(
+      "SELECT * FROM inventario ORDER BY tipo, sabor"
+    );
     res.status(200).json({ success: true, data: rows });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
+  } finally {
+    await pool.end();
   }
 }

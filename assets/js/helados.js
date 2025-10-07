@@ -1,17 +1,10 @@
 // =========================
-// CONFIGURACIÓN API Y CACHÉ
+// BASE DE DATOS DEL INVENTARIO
 // =========================
 
-const API_BASE = "/api";
-
-// Caché simple en memoria
-const cache = {
-  inventario: null,
-  inventarioTime: null,
-  historial: null,
-  historialTime: null,
-  TTL: 30000, // 30 segundos
-};
+let inventario = [];
+let historial = [];
+let contadorId = 1;
 
 // =========================
 // NAVEGACIÓN ENTRE VISTAS
@@ -60,81 +53,6 @@ function showView(viewId) {
 }
 
 // =========================
-// FUNCIONES API CON CACHÉ
-// =========================
-
-async function fetchInventario(forceRefresh = false) {
-  const now = Date.now();
-
-  // Si hay caché válido, usarlo
-  if (
-    !forceRefresh &&
-    cache.inventario &&
-    now - cache.inventarioTime < cache.TTL
-  ) {
-    console.log("Usando caché de inventario");
-    return cache.inventario;
-  }
-
-  try {
-    console.log("Cargando inventario desde API...");
-    const response = await fetch(`${API_BASE}/inventario`);
-    const data = await response.json();
-
-    if (data.success) {
-      cache.inventario = data.data;
-      cache.inventarioTime = now;
-      return data.data;
-    }
-    return [];
-  } catch (error) {
-    console.error("Error al cargar inventario:", error);
-    showAlert("Error al cargar inventario", "error");
-    return cache.inventario || []; // Devolver caché aunque esté expirado
-  }
-}
-
-async function fetchHistorial(forceRefresh = false) {
-  const now = Date.now();
-
-  // Si hay caché válido, usarlo
-  if (
-    !forceRefresh &&
-    cache.historial &&
-    now - cache.historialTime < cache.TTL
-  ) {
-    console.log("Usando caché de historial");
-    return cache.historial;
-  }
-
-  try {
-    console.log("Cargando historial desde API...");
-    const response = await fetch(`${API_BASE}/historial`);
-    const data = await response.json();
-
-    if (data.success) {
-      cache.historial = data.data;
-      cache.historialTime = now;
-      return data.data;
-    }
-    return [];
-  } catch (error) {
-    console.error("Error al cargar historial:", error);
-    showAlert("Error al cargar historial", "error");
-    return cache.historial || [];
-  }
-}
-
-// Función para invalidar caché después de modificaciones
-function invalidateCache() {
-  console.log("Invalidando caché...");
-  cache.inventario = null;
-  cache.inventarioTime = null;
-  cache.historial = null;
-  cache.historialTime = null;
-}
-
-// =========================
 // FUNCIONES DEL INVENTARIO
 // =========================
 
@@ -162,7 +80,7 @@ function updateSubtipo() {
 document.addEventListener("DOMContentLoaded", function () {
   const formCrear = document.getElementById("form-crear");
   if (formCrear) {
-    formCrear.addEventListener("submit", async function (e) {
+    formCrear.addEventListener("submit", function (e) {
       e.preventDefault();
 
       const tipo = document.getElementById("tipo").value;
@@ -180,26 +98,40 @@ document.addEventListener("DOMContentLoaded", function () {
         tipoFinal = `polo-${subtipo}`;
       }
 
-      try {
-        const response = await fetch(`${API_BASE}/crear-helado`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ tipo: tipoFinal, sabor, cantidad }),
+      const stockMin = 2;
+
+      // Buscar si ya existe el producto
+      const existente = inventario.find(
+        (p) =>
+          p.tipo === tipoFinal && p.sabor.toLowerCase() === sabor.toLowerCase()
+      );
+
+      if (existente) {
+        existente.cantidad += cantidad;
+        showAlert(
+          `Stock actualizado: +${cantidad} unidades (Total: ${existente.cantidad})`,
+          "success"
+        );
+      } else {
+        inventario.push({
+          id: contadorId++,
+          tipo: tipoFinal,
+          sabor: sabor,
+          cantidad: cantidad,
+          stockMin: stockMin,
+          consumido: 0,
         });
-
-        const data = await response.json();
-
-        if (data.success) {
-          showAlert(data.message, "success");
-          this.reset();
-          invalidateCache(); // Invalidar caché
-        } else {
-          showAlert(data.error || "Error al crear helado", "error");
-        }
-      } catch (error) {
-        console.error("Error:", error);
-        showAlert("Error al crear helado", "error");
+        showAlert(`Helado creado exitosamente`, "success");
       }
+
+      addHistorial(
+        "entrada",
+        `${getTipoNombre(tipoFinal)} - ${sabor}`,
+        cantidad,
+        "Elaborado"
+      );
+
+      this.reset();
     });
   }
 });
@@ -227,7 +159,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   const formBajar = document.getElementById("form-bajar");
   if (formBajar) {
-    formBajar.addEventListener("submit", async function (e) {
+    formBajar.addEventListener("submit", function (e) {
       e.preventDefault();
 
       const tipo = document.getElementById("tipo-bajar")?.value;
@@ -250,45 +182,47 @@ document.addEventListener("DOMContentLoaded", function () {
         return;
       }
 
-      try {
-        const response = await fetch(`${API_BASE}/bajar-helado`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id }),
-        });
+      const producto = inventario.find((p) => p.id === id);
 
-        const data = await response.json();
-
-        if (data.success) {
-          const producto = data.data;
-
-          if (producto.cantidad === 0) {
-            showAlert(
-              `⚠️ ¡ATENCIÓN! ${producto.sabor} se ha quedado SIN STOCK`,
-              "error"
-            );
-          } else if (producto.cantidad <= 2) {
-            showAlert(
-              `⚠️ ${producto.sabor} tiene STOCK BAJO (${producto.cantidad} unidades)`,
-              "warning"
-            );
-          } else {
-            showAlert(
-              `✅ Stock de ${producto.sabor} reducido correctamente (${producto.cantidad} restantes)`,
-              "success"
-            );
-          }
-
-          invalidateCache(); // Invalidar caché
-          await updateProductosBajar(); // Recargar productos
-          document.getElementById("producto-bajar").value = "";
-        } else {
-          showAlert(data.error || "Error al bajar helado", "error");
-        }
-      } catch (error) {
-        console.error("Error:", error);
-        showAlert("Error al bajar helado", "error");
+      if (!producto) {
+        showAlert("Producto no encontrado", "error");
+        return;
       }
+
+      if (producto.cantidad <= 0) {
+        showAlert("Sin stock disponible", "error");
+        return;
+      }
+
+      producto.cantidad--;
+      producto.consumido = (producto.consumido || 0) + 1;
+
+      addHistorial(
+        "salida",
+        `${getTipoNombre(producto.tipo)} - ${producto.sabor}`,
+        1,
+        "Bajado a tienda"
+      );
+
+      if (producto.cantidad === 0) {
+        showAlert(
+          `⚠️ ¡ATENCIÓN! ${producto.sabor} se ha quedado SIN STOCK`,
+          "error"
+        );
+      } else if (producto.cantidad <= producto.stockMin) {
+        showAlert(
+          `⚠️ ${producto.sabor} tiene STOCK BAJO (${producto.cantidad} unidades)`,
+          "warning"
+        );
+      } else {
+        showAlert(
+          `✅ Stock de ${producto.sabor} reducido correctamente (${producto.cantidad} restantes)`,
+          "success"
+        );
+      }
+
+      updateProductosBajar();
+      document.getElementById("producto-bajar").value = "";
     });
   }
 });
@@ -297,46 +231,49 @@ document.addEventListener("DOMContentLoaded", function () {
 document.addEventListener("DOMContentLoaded", function () {
   const formAjustar = document.getElementById("form-ajustar");
   if (formAjustar) {
-    formAjustar.addEventListener("submit", async function (e) {
+    formAjustar.addEventListener("submit", function (e) {
       e.preventDefault();
 
       const id = parseInt(document.getElementById("producto-ajustar").value);
-      const nuevaCantidad = parseInt(
+      const nuevaCant = parseInt(
         document.getElementById("nueva-cantidad").value
       );
       const motivo = document.getElementById("motivo").value.trim();
+      const producto = inventario.find((p) => p.id === id);
+
+      if (!producto) {
+        showAlert("Producto no encontrado", "error");
+        return;
+      }
+
+      if (nuevaCant < 0) {
+        showAlert("La cantidad no puede ser negativa", "error");
+        return;
+      }
 
       if (!motivo) {
         showAlert("Debes especificar un motivo para el ajuste", "error");
         return;
       }
 
-      if (nuevaCantidad < 0) {
-        showAlert("La cantidad no puede ser negativa", "error");
-        return;
-      }
+      const cantidadAnterior = producto.cantidad;
+      const diferencia = nuevaCant - cantidadAnterior;
+      producto.cantidad = nuevaCant;
 
-      try {
-        const response = await fetch(`${API_BASE}/ajustar-stock`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id, nuevaCantidad, motivo }),
-        });
+      const tipoMovimiento = diferencia >= 0 ? "ajuste+" : "ajuste-";
+      addHistorial(
+        tipoMovimiento,
+        `${getTipoNombre(producto.tipo)} - ${producto.sabor}`,
+        Math.abs(diferencia),
+        `Ajuste: ${motivo}\nInventario ajustado: ${cantidadAnterior} → ${nuevaCant}`
+      );
 
-        const data = await response.json();
-
-        if (data.success) {
-          showAlert("Inventario ajustado correctamente", "success");
-          this.reset();
-          invalidateCache(); // Invalidar caché
-          await cargarProductos("producto-ajustar"); // Recargar productos
-        } else {
-          showAlert(data.error || "Error al ajustar stock", "error");
-        }
-      } catch (error) {
-        console.error("Error:", error);
-        showAlert("Error al ajustar stock", "error");
-      }
+      showAlert(
+        `Inventario ajustado: ${cantidadAnterior} → ${nuevaCant}`,
+        "success"
+      );
+      this.reset();
+      cargarProductos("producto-ajustar");
     });
   }
 });
@@ -345,13 +282,10 @@ document.addEventListener("DOMContentLoaded", function () {
 // FUNCIONES DE DATOS
 // =========================
 
-async function cargarProductos(selectId) {
+function cargarProductos(selectId) {
   const select = document.getElementById(selectId);
   if (!select) return;
 
-  select.innerHTML = '<option value="">Cargando...</option>';
-
-  const inventario = await fetchInventario();
   select.innerHTML = '<option value="">Seleccionar producto...</option>';
 
   let productos = [];
@@ -389,9 +323,8 @@ async function cargarProductos(selectId) {
   }
 }
 
-async function mostrarInventario() {
-  const inventario = await fetchInventario();
-  updateStats(inventario);
+function mostrarInventario() {
+  updateStats();
 
   if (inventario.length === 0) {
     document.getElementById("tabla-inventario").innerHTML =
@@ -427,13 +360,10 @@ async function mostrarInventario() {
   );
 }
 
-async function cargarProductosFiltrados(tipoFiltro) {
+function cargarProductosFiltrados(tipoFiltro) {
   const select = document.getElementById("producto-bajar");
   if (!select) return;
 
-  select.innerHTML = '<option value="">Cargando...</option>';
-
-  const inventario = await fetchInventario();
   select.innerHTML = '<option value="">Seleccionar producto...</option>';
 
   const productos = inventario.filter(
@@ -460,7 +390,7 @@ async function cargarProductosFiltrados(tipoFiltro) {
     });
 }
 
-async function updateProductosBajar() {
+function updateProductosBajar() {
   const tipo = document.getElementById("tipo-bajar").value;
   const group = document.getElementById("subtipo-bajar-group");
   const selectSubtipo = document.getElementById("subtipo-bajar");
@@ -480,7 +410,7 @@ async function updateProductosBajar() {
 
     const subtipo = selectSubtipo.value;
     if (subtipo) {
-      await cargarProductosFiltrados(`polo-${subtipo}`);
+      cargarProductosFiltrados(`polo-${subtipo}`);
     } else {
       selectProducto.innerHTML =
         '<option value="">Primero selecciona un subtipo...</option>';
@@ -490,7 +420,7 @@ async function updateProductosBajar() {
     selectSubtipo.innerHTML =
       '<option value="">Seleccionar subtipo...</option>';
     selectSubtipo.required = false;
-    await cargarProductosFiltrados("barqueta");
+    cargarProductosFiltrados("barqueta");
   } else {
     group.style.display = "none";
     selectSubtipo.innerHTML =
@@ -501,9 +431,8 @@ async function updateProductosBajar() {
   }
 }
 
-async function filtrarTipo() {
+function filtrarTipo() {
   const filtro = document.getElementById("filtro-tipo").value;
-  const inventario = await fetchInventario();
   const filtrados = filtro
     ? inventario.filter((p) => p.tipo === filtro)
     : inventario;
@@ -519,8 +448,8 @@ async function filtrarTipo() {
       const orden = ["barqueta", "polo-fruta", "polo-cremoso"];
       return orden.indexOf(a.tipo) - orden.indexOf(b.tipo);
     }
-    const alertaA = a.cantidad <= (a.stock_min || 2) ? 0 : 1;
-    const alertaB = b.cantidad <= (b.stock_min || 2) ? 0 : 1;
+    const alertaA = a.cantidad <= a.stockMin ? 0 : 1;
+    const alertaB = b.cantidad <= b.stockMin ? 0 : 1;
 
     if (alertaA !== alertaB) return alertaA - alertaB;
     return 0;
@@ -535,15 +464,14 @@ async function filtrarTipo() {
       p.cantidad,
       p.cantidad === 0
         ? '<span class="stock-off">⚠️ SIN STOCK</span>'
-        : p.cantidad <= (p.stock_min || 2)
+        : p.cantidad <= p.stockMin
         ? '<span class="stock-low">⚠️ STOCK BAJO</span>'
         : '<span class="stock-ok">✅ OK</span>',
     ]
   );
 }
 
-async function mostrarAlertas() {
-  const inventario = await fetchInventario();
+function mostrarAlertas() {
   const alertas = inventario.filter((p) => p.cantidad <= 2);
 
   if (alertas.length === 0) {
@@ -592,17 +520,19 @@ async function mostrarAlertas() {
   `;
 }
 
-async function mostrarHistorial() {
-  const historial = await fetchHistorial();
-
+function mostrarHistorial() {
   if (historial.length === 0) {
     document.getElementById("tabla-historial").innerHTML =
       '<div class="empty-state">📝 Sin movimientos registrados</div>';
     return;
   }
 
+  const ordenado = [...historial]
+    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
+    .slice(0, 50);
+
   document.getElementById("tabla-historial").innerHTML = createTable(
-    historial,
+    ordenado,
     ["Fecha", "Movimiento", "Producto", "Cantidad", "Motivo"],
     (h) => [
       formatearFecha(h.fecha),
@@ -614,8 +544,7 @@ async function mostrarHistorial() {
   );
 }
 
-async function mostrarRanking() {
-  const inventario = await fetchInventario();
+function mostrarRanking() {
   const conConsumo = inventario.filter((p) => p.consumido > 0);
 
   if (conConsumo.length === 0) {
@@ -645,7 +574,7 @@ async function mostrarRanking() {
 // FUNCIONES AUXILIARES
 // =========================
 
-function updateStats(inventario) {
+function updateStats() {
   document.getElementById("stat-productos").textContent = inventario.length;
   document.getElementById("stat-unidades").textContent = inventario.reduce(
     (sum, p) => sum + p.cantidad,
@@ -702,6 +631,21 @@ function formatearFecha(fecha) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function addHistorial(tipo, producto, cantidad, motivo = "Operación estándar") {
+  historial.push({
+    id: Date.now() + Math.random(),
+    fecha: new Date().toISOString(),
+    tipo: tipo,
+    producto: producto,
+    cantidad: cantidad,
+    motivo: motivo,
+  });
+
+  if (historial.length > 500) {
+    historial = historial.slice(-500);
+  }
 }
 
 function showAlert(mensaje, tipo) {
