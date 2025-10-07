@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gelateria Di Amore</title>
+    <link rel="stylesheet" href="assets/css/style.css" />
+    <link rel="icon" type="image/png" href="assets/img/corazon.png" />
+  </head>
+  <body>
+    <!-- PANTALLA DE CARGA -->
+    <div class="loading-screen" id="loadingScreen">
+      <div class="heart-custom">
+        <img src="assets/img/corazon.png" alt="Corazón" class="corazon" />
+      </div>
+      <div class="loading-text">Gelateria Di Amore</div>
+      <div class="loading-subtitle">Con amore, desde Italia...</div>
+    </div>
+
+    <!-- CONTENIDO PRINCIPAL -->
+    <div class="main-content-wrapper" id="mainContent">
+      <div class="container" id="main-container">
+        <div id="app-view">
+          <header class="header">
+            <h1>
+              Gelateria Di Am
+              <img src="assets/img/corazon.png" alt="Corazón" class="corazon" />
+              re
+            </h1>
+            <p>El sabor del verdadero gelato italiano</p>
+          </header>
+          <div class="main-content">
+            <div id="main-menu" class="menu-container">
+              <div class="menu-grid menu-grid-index">
+                <div
+                  class="menu-card"
+                  onclick="window.location.href='helados.html'"
+                >
+                  <div class="card-icon">🍦</div>
+                  <div class="card-title">Gestionar Helados</div>
+                  <div class="card-description">Inventario Helados</div>
+                </div>
+                <div class="menu-card">
+                  <div class="card-icon">📦</div>
+                  <div class="card-title">Gestionar Almacén</div>
+                  <div class="card-description">Inventario Almacén</div>
+                </div>
+                <div class="menu-card">
+                  <div class="card-icon">📅</div>
+                  <div class="card-title">Gestionar Horarios</div>
+                  <div class="card-description">Horarios Empleados</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="assets/js/loading.js"></script>
+    <script src="assets/js/script.js"></script>
+  </body>
+</html>

@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Gelateria Di Amore - Gestión de Helados</title>
+    <link rel="stylesheet" href="assets/css/style.css" />
+    <link rel="icon" type="image/png" href="assets/img/corazon.png" />
+  </head>
+  <body>
+    <div class="container" id="main-container">
+      <div id="app-view">
+        <header class="header">
+          <h1>
+            Gelateria Di Am
+            <img src="assets/img/corazon.png" alt="Corazón" class="corazon" />
+            re
+          </h1>
+          <p>Sistema de Gestión de Inventario</p>
+        </header>
+
+        <div class="main-content">
+          <div id="main-menu" class="menu-container">
+            <div class="menu-grid menu-grid-helados">
+              <div class="menu-card" onclick="showView('crear')">
+                <div class="card-icon">➕</div>
+                <div class="card-title">Crear Helado</div>
+                <div class="card-description">Elaborar nuevo helado</div>
+              </div>
+              <div class="menu-card" onclick="showView('bajar')">
+                <div class="card-icon">⬇️</div>
+                <div class="card-title">Bajar Helado</div>
+                <div class="card-description">Reducir 1 unidad</div>
+              </div>
+              <div class="menu-card" onclick="showView('inventario')">
+                <div class="card-icon">📋</div>
+                <div class="card-title">Inventario Completo</div>
+                <div class="card-description">Ver todo el stock disponible</div>
+              </div>
+              <div class="menu-card" onclick="showView('por-tipo')">
+                <div class="card-icon">🔍</div>
+                <div class="card-title">Inventario Por Tipo</div>
+                <div class="card-description">Ver stock filtrado por tipo</div>
+              </div>
+              <div class="menu-card" onclick="showView('alertas')">
+                <div class="card-icon">⚠️</div>
+                <div class="card-title">Alertas Stock</div>
+                <div class="card-description">
+                  Productos que necesitan reposición
+                </div>
+              </div>
+              <div class="menu-card" onclick="showView('historial')">
+                <div class="card-icon">📈</div>
+                <div class="card-title">Historial</div>
+                <div class="card-description">Movimientos registrados</div>
+              </div>
+              <div class="menu-card" onclick="showView('ajustar')">
+                <div class="card-icon">⚙️</div>
+                <div class="card-title">Ajustar Stock</div>
+                <div class="card-description">Correcciones manuales</div>
+              </div>
+              <div class="menu-card" onclick="showView('ranking')">
+                <div class="card-icon">🏆</div>
+                <div class="card-title">Más Consumidos</div>
+                <div class="card-description">
+                  Ranking de helados más vendidos
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Vista Crear -->
+          <div id="crear" class="current-view">
+            <button class="back-btn" onclick="showMenu()">
+              ← Volver al Menú
+            </button>
+            <h2>Crear Helado</h2>
+            <form id="form-crear">
+              <div class="form-group">
+                <label>Tipo:</label>
+                <select id="tipo" required onchange="updateSubtipo()">
+                  <option value="">Seleccionar tipo...</option>
+                  <option value="barqueta">Barqueta</option>
+                  <option value="polo">Polo</option>
+                </select>
+              </div>
+              <div class="form-group" id="subtipo-group" style="display: none">
+                <label>Subtipo:</label>
+                <select id="subtipo">
+                  <option value="">Seleccionar subtipo...</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Sabor:</label>
+                <input
+                  type="text"
+                  id="sabor"
+                  required
+                  placeholder="Ej: Fresa, Oreo..."
+                />
+              </div>
+              <div class="form-group">
+                <label>Cantidad:</label>
+                <input
+                  type="number"
+                  id="cantidad"
+                  min="1"
+                  required
+                  placeholder="Número de unidades"
+                />
+              </div>
+              <button type="submit" class="submit-btn">Crear Helado</button>
+            </form>
+          </div>
+
+          <!-- Vista Bajar -->
+          <div id="bajar" class="current-view">
+            <button class="back-btn" onclick="showMenu()">
+              ← Volver al Menú
+            </button>
+            <h2>Bajar Helado del Stock</h2>
+            <form id="form-bajar">
+              <div class="form-group">
+                <label>Tipo:</label>
+                <select id="tipo-bajar" required>
+                  <option value="">Seleccionar tipo...</option>
+                  <option value="barqueta">Barqueta</option>
+                  <option value="polo">Polo</option>
+                </select>
+              </div>
+              <div
+                class="form-group"
+                id="subtipo-bajar-group"
+                style="display: none"
+              >
+                <label>Subtipo:</label>
+                <select id="subtipo-bajar">
+                  <option value="">Seleccionar subtipo...</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Producto:</label>
+                <select id="producto-bajar" required>
+                  <option value="">Primero selecciona un tipo...</option>
+                </select>
+              </div>
+              <button type="submit" class="submit-btn">Bajar 1 Unidad</button>
+            </form>
+          </div>
+
+          <!-- Vista Inventario -->
+          <div id="inventario" class="current-view">
+            <button class="back-btn" onclick="showMenu()">
+              ← Volver al Menú
+            </button>
+            <h2>Inventario Completo</h2>
+            <div class="stats-grid">
+              <div class="stat-card">
+                <div class="stat-number" id="stat-productos">0</div>
+                <div class="stat-label">Productos</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-number" id="stat-unidades">0</div>
+                <div class="stat-label">Unidades</div>
+              </div>
+              <div class="stat-card">
+                <div class="stat-number" id="stat-alertas">0</div>
+                <div class="stat-label">Alertas</div>
+              </div>
+            </div>
+            <div id="tabla-inventario"></div>
+          </div>
+
+          <!-- Vista Por Tipo -->
+          <div id="por-tipo" class="current-view">
+            <button class="back-btn" onclick="showMenu()">
+              ← Volver al Menú
+            </button>
+            <h2>Inventario por Tipo</h2>
+            <div class="form-group">
+              <label>Filtrar por:</label>
+              <select id="filtro-tipo" onchange="filtrarTipo()">
+                <option value="">Todos los tipos</option>
+                <option value="barqueta">Barquetas</option>
+                <option value="polo-fruta">Polos de Fruta</option>
+                <option value="polo-cremoso">Polos Cremosos</option>
+              </select>
+            </div>
+            <div id="tabla-filtrada"></div>
+          </div>
+
+          <!-- Vista Alertas -->
+          <div id="alertas" class="current-view">
+            <button class="back-btn" onclick="showMenu()">
+              ← Volver al Menú
+            </button>
+            <h2>Alertas de Stock</h2>
+            <div id="contenido-alertas"></div>
+          </div>
+
+          <!-- Vista Historial -->
+          <div id="historial" class="current-view">
+            <button class="back-btn" onclick="showMenu()">
+              ← Volver al Menú
+            </button>
+            <h2>Historial de Movimientos</h2>
+            <div id="tabla-historial"></div>
+          </div>
+
+          <!-- Vista Ajustar -->
+          <div id="ajustar" class="current-view">
+            <button class="back-btn" onclick="showMenu()">
+              ← Volver al Menú
+            </button>
+            <h2>Ajustar Inventario</h2>
+            <form id="form-ajustar">
+              <div class="form-group">
+                <label>Producto:</label>
+                <select id="producto-ajustar" required>
+                  <option value="">Seleccionar producto...</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label>Nueva Cantidad:</label>
+                <input
+                  type="number"
+                  id="nueva-cantidad"
+                  min="0"
+                  required
+                  placeholder="Nueva cantidad"
+                />
+              </div>
+              <div class="form-group">
+                <label>Motivo del Ajuste:</label>
+                <input
+                  type="text"
+                  id="motivo"
+                  placeholder="Ej: Inventario físico, merma, etc."
+                  required
+                />
+              </div>
+              <button type="submit" class="submit-btn">Ajustar Stock</button>
+            </form>
+          </div>
+
+          <!-- Vista Ranking -->
+          <div id="ranking" class="current-view">
+            <button class="back-btn" onclick="showMenu()">
+              ← Volver al Menú
+            </button>
+            <h2>Productos Más Consumidos</h2>
+            <div id="tabla-ranking"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="assets/js/helados.js"></script>
+  </body>
+</html>
