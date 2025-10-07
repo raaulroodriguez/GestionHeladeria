@@ -60,31 +60,78 @@ function showView(viewId) {
 }
 
 // =========================
-// FUNCIONES API
+// FUNCIONES API CON CACHÉ
 // =========================
 
-async function fetchInventario() {
+async function fetchInventario(forceRefresh = false) {
+  const now = Date.now();
+
+  // Si hay caché válido, usarlo
+  if (
+    !forceRefresh &&
+    cache.inventario &&
+    now - cache.inventarioTime < cache.TTL
+  ) {
+    console.log("Usando caché de inventario");
+    return cache.inventario;
+  }
+
   try {
+    console.log("Cargando inventario desde API...");
     const response = await fetch(`${API_BASE}/inventario`);
     const data = await response.json();
-    return data.success ? data.data : [];
+
+    if (data.success) {
+      cache.inventario = data.data;
+      cache.inventarioTime = now;
+      return data.data;
+    }
+    return [];
   } catch (error) {
     console.error("Error al cargar inventario:", error);
     showAlert("Error al cargar inventario", "error");
-    return [];
+    return cache.inventario || []; // Devolver caché aunque esté expirado
   }
 }
 
-async function fetchHistorial() {
+async function fetchHistorial(forceRefresh = false) {
+  const now = Date.now();
+
+  // Si hay caché válido, usarlo
+  if (
+    !forceRefresh &&
+    cache.historial &&
+    now - cache.historialTime < cache.TTL
+  ) {
+    console.log("Usando caché de historial");
+    return cache.historial;
+  }
+
   try {
+    console.log("Cargando historial desde API...");
     const response = await fetch(`${API_BASE}/historial`);
     const data = await response.json();
-    return data.success ? data.data : [];
+
+    if (data.success) {
+      cache.historial = data.data;
+      cache.historialTime = now;
+      return data.data;
+    }
+    return [];
   } catch (error) {
     console.error("Error al cargar historial:", error);
     showAlert("Error al cargar historial", "error");
-    return [];
+    return cache.historial || [];
   }
+}
+
+// Función para invalidar caché después de modificaciones
+function invalidateCache() {
+  console.log("Invalidando caché...");
+  cache.inventario = null;
+  cache.inventarioTime = null;
+  cache.historial = null;
+  cache.historialTime = null;
 }
 
 // =========================
@@ -145,6 +192,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (data.success) {
           showAlert(data.message, "success");
           this.reset();
+          invalidateCache(); // Invalidar caché
         } else {
           showAlert(data.error || "Error al crear helado", "error");
         }
@@ -231,7 +279,8 @@ document.addEventListener("DOMContentLoaded", function () {
             );
           }
 
-          updateProductosBajar();
+          invalidateCache(); // Invalidar caché
+          await updateProductosBajar(); // Recargar productos
           document.getElementById("producto-bajar").value = "";
         } else {
           showAlert(data.error || "Error al bajar helado", "error");
@@ -279,7 +328,8 @@ document.addEventListener("DOMContentLoaded", function () {
         if (data.success) {
           showAlert("Inventario ajustado correctamente", "success");
           this.reset();
-          cargarProductos("producto-ajustar");
+          invalidateCache(); // Invalidar caché
+          await cargarProductos("producto-ajustar"); // Recargar productos
         } else {
           showAlert(data.error || "Error al ajustar stock", "error");
         }
@@ -469,8 +519,8 @@ async function filtrarTipo() {
       const orden = ["barqueta", "polo-fruta", "polo-cremoso"];
       return orden.indexOf(a.tipo) - orden.indexOf(b.tipo);
     }
-    const alertaA = a.cantidad <= a.stock_min ? 0 : 1;
-    const alertaB = b.cantidad <= b.stock_min ? 0 : 1;
+    const alertaA = a.cantidad <= (a.stock_min || 2) ? 0 : 1;
+    const alertaB = b.cantidad <= (b.stock_min || 2) ? 0 : 1;
 
     if (alertaA !== alertaB) return alertaA - alertaB;
     return 0;
@@ -485,7 +535,7 @@ async function filtrarTipo() {
       p.cantidad,
       p.cantidad === 0
         ? '<span class="stock-off">⚠️ SIN STOCK</span>'
-        : p.cantidad <= p.stock_min
+        : p.cantidad <= (p.stock_min || 2)
         ? '<span class="stock-low">⚠️ STOCK BAJO</span>'
         : '<span class="stock-ok">✅ OK</span>',
     ]
@@ -652,26 +702,6 @@ function formatearFecha(fecha) {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function showLoading(mensaje = "Cargando...") {
-  const loading = document.createElement("div");
-  loading.id = "loading-overlay";
-  loading.innerHTML = `
-    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
-                background: rgba(0,0,0,0.5); display: flex; align-items: center; 
-                justify-content: center; z-index: 9999;">
-      <div style="background: white; padding: 20px; border-radius: 10px;">
-        <p style="margin: 0; font-weight: bold;">${mensaje}</p>
-      </div>
-    </div>
-  `;
-  document.body.appendChild(loading);
-}
-
-function hideLoading() {
-  const loading = document.getElementById("loading-overlay");
-  if (loading) loading.remove();
 }
 
 function showAlert(mensaje, tipo) {
