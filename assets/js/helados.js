@@ -1,8 +1,17 @@
 // =========================
-// CONFIGURACIÓN API
+// CONFIGURACIÓN API Y CACHÉ
 // =========================
 
 const API_BASE = "/api";
+
+// Caché simple en memoria
+const cache = {
+  inventario: null,
+  inventarioTime: null,
+  historial: null,
+  historialTime: null,
+  TTL: 30000, // 30 segundos
+};
 
 // =========================
 // NAVEGACIÓN ENTRE VISTAS
@@ -643,6 +652,26 @@ function formatearFecha(fecha) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function showLoading(mensaje = "Cargando...") {
+  const loading = document.createElement("div");
+  loading.id = "loading-overlay";
+  loading.innerHTML = `
+    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                background: rgba(0,0,0,0.5); display: flex; align-items: center; 
+                justify-content: center; z-index: 9999;">
+      <div style="background: white; padding: 20px; border-radius: 10px;">
+        <p style="margin: 0; font-weight: bold;">${mensaje}</p>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(loading);
+}
+
+function hideLoading() {
+  const loading = document.getElementById("loading-overlay");
+  if (loading) loading.remove();
 }
 
 function showAlert(mensaje, tipo) {
