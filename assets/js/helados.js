@@ -1,10 +1,12 @@
 // =========================
-// BASE DE DATOS DEL INVENTARIO
+// CONFIGURACIÓN API
 // =========================
 
-let inventario = [];
-let historial = [];
-let contadorId = 1;
+const API_BASE = "/api";
+
+// Variables locales para caché (opcional)
+let inventarioCache = [];
+let historialCache = [];
 
 // =========================
 // NAVEGACIÓN ENTRE VISTAS
@@ -53,6 +55,42 @@ function showView(viewId) {
 }
 
 // =========================
+// FUNCIONES API
+// =========================
+
+async function fetchInventario() {
+  try {
+    const response = await fetch(`${API_BASE}/inventario`);
+    const data = await response.json();
+    if (data.success) {
+      inventarioCache = data.data;
+      return data.data;
+    }
+    return [];
+  } catch (error) {
+    console.error("Error al cargar inventario:", error);
+    showAlert("Error al cargar inventario desde el servidor", "error");
+    return [];
+  }
+}
+
+async function fetchHistorial() {
+  try {
+    const response = await fetch(`${API_BASE}/historial`);
+    const data = await response.json();
+    if (data.success) {
+      historialCache = data.data;
+      return data.data;
+    }
+    return [];
+  } catch (error) {
+    console.error("Error al cargar historial:", error);
+    showAlert("Error al cargar historial desde el servidor", "error");
+    return [];
+  }
+}
+
+// =========================
 // FUNCIONES DEL INVENTARIO
 // =========================
 
@@ -76,11 +114,15 @@ function updateSubtipo() {
   }
 }
 
+// =========================
+// FORMULARIOS
+// =========================
+
 // Formulario crear helado
 document.addEventListener("DOMContentLoaded", function () {
   const formCrear = document.getElementById("form-crear");
   if (formCrear) {
-    formCrear.addEventListener("submit", function (e) {
+    formCrear.addEventListener("submit", async function (e) {
       e.preventDefault();
 
       const tipo = document.getElementById("tipo").value;
@@ -98,40 +140,25 @@ document.addEventListener("DOMContentLoaded", function () {
         tipoFinal = `polo-${subtipo}`;
       }
 
-      const stockMin = 2;
-
-      // Buscar si ya existe el producto
-      const existente = inventario.find(
-        (p) =>
-          p.tipo === tipoFinal && p.sabor.toLowerCase() === sabor.toLowerCase()
-      );
-
-      if (existente) {
-        existente.cantidad += cantidad;
-        showAlert(
-          `Stock actualizado: +${cantidad} unidades (Total: ${existente.cantidad})`,
-          "success"
-        );
-      } else {
-        inventario.push({
-          id: contadorId++,
-          tipo: tipoFinal,
-          sabor: sabor,
-          cantidad: cantidad,
-          stockMin: stockMin,
-          consumido: 0,
+      try {
+        const response = await fetch(`${API_BASE}/crear-helado`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ tipo: tipoFinal, sabor, cantidad }),
         });
-        showAlert(`Helado creado exitosamente`, "success");
+
+        const data = await response.json();
+
+        if (data.success) {
+          showAlert(data.message || "Helado creado exitosamente", "success");
+          this.reset();
+        } else {
+          showAlert(data.error || "Error al crear helado", "error");
+        }
+      } catch (error) {
+        console.error("Error:", error);
+        showAlert("Error de conexión al crear helado", "error");
       }
-
-      addHistorial(
-        "entrada",
-        `${getTipoNombre(tipoFinal)} - ${sabor}`,
-        cantidad,
-        "Elaborado"
-      );
-
-      this.reset();
     });
   }
 });
@@ -159,7 +186,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
   const formBajar = document.getElementById("form-bajar");
   if (formBajar) {
-    formBajar.addEventListener("submit", function (e) {
+    formBajar.addEventListener("submit", async function (e) {
       e.preventDefault();
 
       const tipo = document.getElementById("tipo-bajar")?.value;
@@ -182,47 +209,44 @@ document.addEventListener("DOMContentLoaded", function () {
         return;
       }
 
-      const producto = inventario.find((p) => p.id === id);
+      try {
+        const response = await fetch(`${API_BASE}/bajar-helado`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id }),
+        });
 
-      if (!producto) {
-        showAlert("Producto no encontrado", "error");
-        return;
+        const data = await response.json();
+
+        if (data.success) {
+          const producto = data.data;
+
+          if (producto.cantidad === 0) {
+            showAlert(
+              `⚠️ ¡ATENCIÓN! ${producto.sabor} se ha quedado SIN STOCK`,
+              "error"
+            );
+          } else if (producto.cantidad <= 2) {
+            showAlert(
+              `⚠️ ${producto.sabor} tiene STOCK BAJO (${producto.cantidad} unidades)`,
+              "warning"
+            );
+          } else {
+            showAlert(
+              `✅ Stock de ${producto.sabor} reducido correctamente (${producto.cantidad} restantes)`,
+              "success"
+            );
+          }
+
+          await updateProductosBajar();
+          document.getElementById("producto-bajar").value = "";
+        } else {
+          showAlert(data.error || "Error al bajar helado", "error");
+        }
+      } catch (error) {
+        console.error("Error:", error);
+        showAlert("Error de conexión al bajar helado", "error");
       }
-
-      if (producto.cantidad <= 0) {
-        showAlert("Sin stock disponible", "error");
-        return;
-      }
-
-      producto.cantidad--;
-      producto.consumido = (producto.consumido || 0) + 1;
-
-      addHistorial(
-        "salida",
-        `${getTipoNombre(producto.tipo)} - ${producto.sabor}`,
-        1,
-        "Bajado a tienda"
-      );
-
-      if (producto.cantidad === 0) {
-        showAlert(
-          `⚠️ ¡ATENCIÓN! ${producto.sabor} se ha quedado SIN STOCK`,
-          "error"
-        );
-      } else if (producto.cantidad <= producto.stockMin) {
-        showAlert(
-          `⚠️ ${producto.sabor} tiene STOCK BAJO (${producto.cantidad} unidades)`,
-          "warning"
-        );
-      } else {
-        showAlert(
-          `✅ Stock de ${producto.sabor} reducido correctamente (${producto.cantidad} restantes)`,
-          "success"
-        );
-      }
-
-      updateProductosBajar();
-      document.getElementById("producto-bajar").value = "";
     });
   }
 });
@@ -231,49 +255,48 @@ document.addEventListener("DOMContentLoaded", function () {
 document.addEventListener("DOMContentLoaded", function () {
   const formAjustar = document.getElementById("form-ajustar");
   if (formAjustar) {
-    formAjustar.addEventListener("submit", function (e) {
+    formAjustar.addEventListener("submit", async function (e) {
       e.preventDefault();
 
       const id = parseInt(document.getElementById("producto-ajustar").value);
-      const nuevaCant = parseInt(
+      const nuevaCantidad = parseInt(
         document.getElementById("nueva-cantidad").value
       );
       const motivo = document.getElementById("motivo").value.trim();
-      const producto = inventario.find((p) => p.id === id);
-
-      if (!producto) {
-        showAlert("Producto no encontrado", "error");
-        return;
-      }
-
-      if (nuevaCant < 0) {
-        showAlert("La cantidad no puede ser negativa", "error");
-        return;
-      }
 
       if (!motivo) {
         showAlert("Debes especificar un motivo para el ajuste", "error");
         return;
       }
 
-      const cantidadAnterior = producto.cantidad;
-      const diferencia = nuevaCant - cantidadAnterior;
-      producto.cantidad = nuevaCant;
+      if (nuevaCantidad < 0) {
+        showAlert("La cantidad no puede ser negativa", "error");
+        return;
+      }
 
-      const tipoMovimiento = diferencia >= 0 ? "ajuste+" : "ajuste-";
-      addHistorial(
-        tipoMovimiento,
-        `${getTipoNombre(producto.tipo)} - ${producto.sabor}`,
-        Math.abs(diferencia),
-        `Ajuste: ${motivo}\nInventario ajustado: ${cantidadAnterior} → ${nuevaCant}`
-      );
+      try {
+        const response = await fetch(`${API_BASE}/ajustar-stock`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, nuevaCantidad, motivo }),
+        });
 
-      showAlert(
-        `Inventario ajustado: ${cantidadAnterior} → ${nuevaCant}`,
-        "success"
-      );
-      this.reset();
-      cargarProductos("producto-ajustar");
+        const data = await response.json();
+
+        if (data.success) {
+          showAlert(
+            data.message || "Inventario ajustado correctamente",
+            "success"
+          );
+          this.reset();
+          await cargarProductos("producto-ajustar");
+        } else {
+          showAlert(data.error || "Error al ajustar stock", "error");
+        }
+      } catch (error) {
+        console.error("Error:", error);
+        showAlert("Error de conexión al ajustar stock", "error");
+      }
     });
   }
 });
@@ -282,10 +305,13 @@ document.addEventListener("DOMContentLoaded", function () {
 // FUNCIONES DE DATOS
 // =========================
 
-function cargarProductos(selectId) {
+async function cargarProductos(selectId) {
   const select = document.getElementById(selectId);
   if (!select) return;
 
+  select.innerHTML = '<option value="">Cargando...</option>';
+
+  const inventario = await fetchInventario();
   select.innerHTML = '<option value="">Seleccionar producto...</option>';
 
   let productos = [];
@@ -323,8 +349,9 @@ function cargarProductos(selectId) {
   }
 }
 
-function mostrarInventario() {
-  updateStats();
+async function mostrarInventario() {
+  const inventario = await fetchInventario();
+  updateStats(inventario);
 
   if (inventario.length === 0) {
     document.getElementById("tabla-inventario").innerHTML =
@@ -360,10 +387,13 @@ function mostrarInventario() {
   );
 }
 
-function cargarProductosFiltrados(tipoFiltro) {
+async function cargarProductosFiltrados(tipoFiltro) {
   const select = document.getElementById("producto-bajar");
   if (!select) return;
 
+  select.innerHTML = '<option value="">Cargando...</option>';
+
+  const inventario = await fetchInventario();
   select.innerHTML = '<option value="">Seleccionar producto...</option>';
 
   const productos = inventario.filter(
@@ -390,7 +420,7 @@ function cargarProductosFiltrados(tipoFiltro) {
     });
 }
 
-function updateProductosBajar() {
+async function updateProductosBajar() {
   const tipo = document.getElementById("tipo-bajar").value;
   const group = document.getElementById("subtipo-bajar-group");
   const selectSubtipo = document.getElementById("subtipo-bajar");
@@ -410,7 +440,7 @@ function updateProductosBajar() {
 
     const subtipo = selectSubtipo.value;
     if (subtipo) {
-      cargarProductosFiltrados(`polo-${subtipo}`);
+      await cargarProductosFiltrados(`polo-${subtipo}`);
     } else {
       selectProducto.innerHTML =
         '<option value="">Primero selecciona un subtipo...</option>';
@@ -420,7 +450,7 @@ function updateProductosBajar() {
     selectSubtipo.innerHTML =
       '<option value="">Seleccionar subtipo...</option>';
     selectSubtipo.required = false;
-    cargarProductosFiltrados("barqueta");
+    await cargarProductosFiltrados("barqueta");
   } else {
     group.style.display = "none";
     selectSubtipo.innerHTML =
@@ -431,8 +461,9 @@ function updateProductosBajar() {
   }
 }
 
-function filtrarTipo() {
+async function filtrarTipo() {
   const filtro = document.getElementById("filtro-tipo").value;
+  const inventario = await fetchInventario();
   const filtrados = filtro
     ? inventario.filter((p) => p.tipo === filtro)
     : inventario;
@@ -448,8 +479,9 @@ function filtrarTipo() {
       const orden = ["barqueta", "polo-fruta", "polo-cremoso"];
       return orden.indexOf(a.tipo) - orden.indexOf(b.tipo);
     }
-    const alertaA = a.cantidad <= a.stockMin ? 0 : 1;
-    const alertaB = b.cantidad <= b.stockMin ? 0 : 1;
+    const stockMin = a.stock_min || 2;
+    const alertaA = a.cantidad <= stockMin ? 0 : 1;
+    const alertaB = b.cantidad <= stockMin ? 0 : 1;
 
     if (alertaA !== alertaB) return alertaA - alertaB;
     return 0;
@@ -458,20 +490,24 @@ function filtrarTipo() {
   document.getElementById("tabla-filtrada").innerHTML = createTable(
     ordenados,
     ["Tipo", "Sabor", "Stock", "Estado"],
-    (p) => [
-      getTipoNombre(p.tipo),
-      p.sabor,
-      p.cantidad,
-      p.cantidad === 0
-        ? '<span class="stock-off">⚠️ SIN STOCK</span>'
-        : p.cantidad <= p.stockMin
-        ? '<span class="stock-low">⚠️ STOCK BAJO</span>'
-        : '<span class="stock-ok">✅ OK</span>',
-    ]
+    (p) => {
+      const stockMin = p.stock_min || 2;
+      return [
+        getTipoNombre(p.tipo),
+        p.sabor,
+        p.cantidad,
+        p.cantidad === 0
+          ? '<span class="stock-off">⚠️ SIN STOCK</span>'
+          : p.cantidad <= stockMin
+          ? '<span class="stock-low">⚠️ STOCK BAJO</span>'
+          : '<span class="stock-ok">✅ OK</span>',
+      ];
+    }
   );
 }
 
-function mostrarAlertas() {
+async function mostrarAlertas() {
+  const inventario = await fetchInventario();
   const alertas = inventario.filter((p) => p.cantidad <= 2);
 
   if (alertas.length === 0) {
@@ -520,19 +556,17 @@ function mostrarAlertas() {
   `;
 }
 
-function mostrarHistorial() {
+async function mostrarHistorial() {
+  const historial = await fetchHistorial();
+
   if (historial.length === 0) {
     document.getElementById("tabla-historial").innerHTML =
       '<div class="empty-state">📝 Sin movimientos registrados</div>';
     return;
   }
 
-  const ordenado = [...historial]
-    .sort((a, b) => new Date(b.fecha) - new Date(a.fecha))
-    .slice(0, 50);
-
   document.getElementById("tabla-historial").innerHTML = createTable(
-    ordenado,
+    historial,
     ["Fecha", "Movimiento", "Producto", "Cantidad", "Motivo"],
     (h) => [
       formatearFecha(h.fecha),
@@ -544,7 +578,8 @@ function mostrarHistorial() {
   );
 }
 
-function mostrarRanking() {
+async function mostrarRanking() {
+  const inventario = await fetchInventario();
   const conConsumo = inventario.filter((p) => p.consumido > 0);
 
   if (conConsumo.length === 0) {
@@ -574,7 +609,7 @@ function mostrarRanking() {
 // FUNCIONES AUXILIARES
 // =========================
 
-function updateStats() {
+function updateStats(inventario) {
   document.getElementById("stat-productos").textContent = inventario.length;
   document.getElementById("stat-unidades").textContent = inventario.reduce(
     (sum, p) => sum + p.cantidad,
@@ -631,21 +666,6 @@ function formatearFecha(fecha) {
     hour: "2-digit",
     minute: "2-digit",
   });
-}
-
-function addHistorial(tipo, producto, cantidad, motivo = "Operación estándar") {
-  historial.push({
-    id: Date.now() + Math.random(),
-    fecha: new Date().toISOString(),
-    tipo: tipo,
-    producto: producto,
-    cantidad: cantidad,
-    motivo: motivo,
-  });
-
-  if (historial.length > 500) {
-    historial = historial.slice(-500);
-  }
 }
 
 function showAlert(mensaje, tipo) {
