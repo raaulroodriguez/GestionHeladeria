@@ -1,4 +1,5 @@
 import { Pool } from "@neondatabase/serverless";
+<<<<<<< HEAD
 
 // Función de notificación inline
 async function enviarNotificacion(
@@ -38,6 +39,8 @@ async function enviarNotificacion(
     console.error("Error en notificación Telegram:", error);
   }
 }
+=======
+>>>>>>> parent of 67b0873 (CONFIGURAR NOTIFICACIONES)
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -76,15 +79,6 @@ export default async function handler(req, res) {
         Math.abs(diferencia),
         `Ajuste: ${motivo}`,
       ]
-    );
-
-    // 🔔 NOTIFICACIÓN TELEGRAM
-    await enviarNotificacion(
-      "ajustar",
-      `${producto.rows[0].tipo} - ${producto.rows[0].sabor}`,
-      diferencia,
-      nuevaCantidad,
-      motivo
     );
 
     res.status(200).json({ success: true, data: result.rows[0] });
