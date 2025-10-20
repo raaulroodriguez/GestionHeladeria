@@ -1,4 +1,5 @@
 import { Pool } from "@neondatabase/serverless";
+import { enviarNotificacion } from "./utils/notificar.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -9,7 +10,6 @@ export default async function handler(req, res) {
   const { id } = req.body;
 
   try {
-    // Obtener producto
     const producto = await pool.query(
       "SELECT * FROM inventario WHERE id = $1",
       [id]
@@ -27,13 +27,13 @@ export default async function handler(req, res) {
         .json({ success: false, error: "Sin stock disponible" });
     }
 
-    // Reducir cantidad
     const result = await pool.query(
       "UPDATE inventario SET cantidad = cantidad - 1, consumido = consumido + 1, updated_at = NOW() WHERE id = $1 RETURNING *",
       [id]
     );
 
-    // Registrar en historial
+    const stockActual = result.rows[0].cantidad;
+
     await pool.query(
       "INSERT INTO historial (tipo, producto, cantidad, motivo) VALUES ($1, $2, $3, $4)",
       [
@@ -42,6 +42,14 @@ export default async function handler(req, res) {
         1,
         "Bajado a tienda",
       ]
+    );
+
+    // 🔔 NOTIFICACIÓN TELEGRAM
+    await enviarNotificacion(
+      "bajar",
+      `${producto.rows[0].tipo} - ${producto.rows[0].sabor}`,
+      1,
+      stockActual
     );
 
     res.status(200).json({ success: true, data: result.rows[0] });

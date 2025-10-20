@@ -1,4 +1,5 @@
 import { Pool } from "@neondatabase/serverless";
+import { enviarNotificacion } from "./utils/notificar.js";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -9,24 +10,30 @@ export default async function handler(req, res) {
   const { tipo, sabor, cantidad } = req.body;
 
   try {
-    // Verificar si existe
     const checkQuery =
       "SELECT * FROM inventario WHERE tipo = $1 AND LOWER(sabor) = LOWER($2)";
     const check = await pool.query(checkQuery, [tipo, sabor]);
 
+    let result;
+    let stockActual;
+
     if (check.rows.length > 0) {
-      // Actualizar cantidad
       const updateQuery =
         "UPDATE inventario SET cantidad = cantidad + $1, updated_at = NOW() WHERE id = $2 RETURNING *";
-      const result = await pool.query(updateQuery, [
-        cantidad,
-        check.rows[0].id,
-      ]);
+      result = await pool.query(updateQuery, [cantidad, check.rows[0].id]);
+      stockActual = result.rows[0].cantidad;
 
-      // Registrar en historial
       await pool.query(
         "INSERT INTO historial (tipo, producto, cantidad, motivo) VALUES ($1, $2, $3, $4)",
         ["entrada", `${tipo} - ${sabor}`, cantidad, "Elaborado"]
+      );
+
+      // 🔔 NOTIFICACIÓN TELEGRAM
+      await enviarNotificacion(
+        "crear",
+        `${tipo} - ${sabor}`,
+        cantidad,
+        stockActual
       );
 
       res.status(200).json({
@@ -35,15 +42,22 @@ export default async function handler(req, res) {
         message: "Stock actualizado",
       });
     } else {
-      // Crear nuevo
       const insertQuery =
         "INSERT INTO inventario (tipo, sabor, cantidad, stock_min, consumido) VALUES ($1, $2, $3, 2, 0) RETURNING *";
-      const result = await pool.query(insertQuery, [tipo, sabor, cantidad]);
+      result = await pool.query(insertQuery, [tipo, sabor, cantidad]);
+      stockActual = result.rows[0].cantidad;
 
-      // Registrar en historial
       await pool.query(
         "INSERT INTO historial (tipo, producto, cantidad, motivo) VALUES ($1, $2, $3, $4)",
         ["entrada", `${tipo} - ${sabor}`, cantidad, "Elaborado"]
+      );
+
+      // 🔔 NOTIFICACIÓN TELEGRAM
+      await enviarNotificacion(
+        "crear",
+        `${tipo} - ${sabor}`,
+        cantidad,
+        stockActual
       );
 
       res.status(201).json({
