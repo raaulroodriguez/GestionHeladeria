@@ -95,13 +95,16 @@
                 </select>
               </div>
               <div class="form-group">
-                <label
-                  >Sabor (¡Debe coincidir exactamente con el ya creado!):</label
-                >
+                <label>Sabor:</label>
+                <select id="sabor-select" onchange="handleSaborChange()">
+                  <option value="">Seleccionar sabor...</option>
+                </select>
+              </div>
+              <div class="form-group" id="sabor-nuevo-group" style="display: none">
+                <label>Nuevo Sabor:</label>
                 <input
                   type="text"
-                  id="sabor"
-                  required
+                  id="sabor-nuevo"
                   placeholder="Ej: Fresa, Oreo..."
                 />
               </div>

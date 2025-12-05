@@ -111,6 +111,62 @@ function updateSubtipo() {
     group.style.display = "none";
     select.innerHTML = '<option value="">Seleccionar subtipo...</option>';
     select.required = false;
+    // Si no es polo, cargar sabores directamente
+    if (tipo) {
+      cargarSabores(tipo);
+    }
+  }
+}
+
+async function cargarSabores(tipo) {
+  const selectSabor = document.getElementById("sabor-select");
+  if (!selectSabor) return;
+
+  selectSabor.innerHTML = '<option value="">Cargando...</option>';
+
+  try {
+    const response = await fetch(`${API_BASE}/sabores?tipo=${tipo}`);
+    const data = await response.json();
+
+    selectSabor.innerHTML = '<option value="">Seleccionar sabor...</option>';
+
+    if (data.success && data.data.length > 0) {
+      data.data.forEach(sabor => {
+        const option = document.createElement("option");
+        option.value = sabor;
+        option.textContent = sabor;
+        selectSabor.appendChild(option);
+      });
+    }
+
+    // Opción para crear nuevo sabor
+    const optionNuevo = document.createElement("option");
+    optionNuevo.value = "__nuevo__";
+    optionNuevo.textContent = "➕ Crear nuevo sabor...";
+    selectSabor.appendChild(optionNuevo);
+
+  } catch (error) {
+    console.error("Error al cargar sabores:", error);
+    selectSabor.innerHTML = '<option value="">Error al cargar sabores</option>';
+    const optionNuevo = document.createElement("option");
+    optionNuevo.value = "__nuevo__";
+    optionNuevo.textContent = "➕ Crear nuevo sabor...";
+    selectSabor.appendChild(optionNuevo);
+  }
+}
+
+function handleSaborChange() {
+  const selectSabor = document.getElementById("sabor-select");
+  const grupoNuevo = document.getElementById("sabor-nuevo-group");
+  const inputNuevo = document.getElementById("sabor-nuevo");
+
+  if (selectSabor.value === "__nuevo__") {
+    grupoNuevo.style.display = "block";
+    inputNuevo.required = true;
+  } else {
+    grupoNuevo.style.display = "none";
+    inputNuevo.required = false;
+    inputNuevo.value = "";
   }
 }
 
@@ -120,6 +176,20 @@ function updateSubtipo() {
 
 // Formulario crear helado
 document.addEventListener("DOMContentLoaded", function () {
+  // Listener para cambio de subtipo (polo)
+  const subtipoSelect = document.getElementById("subtipo");
+  if (subtipoSelect) {
+    subtipoSelect.addEventListener("change", function () {
+      const tipo = document.getElementById("tipo").value;
+      const subtipo = this.value;
+
+      if (tipo === "polo" && subtipo) {
+        const tipoFinal = `polo-${subtipo}`;
+        cargarSabores(tipoFinal);
+      }
+    });
+  }
+
   const formCrear = document.getElementById("form-crear");
   if (formCrear) {
     formCrear.addEventListener("submit", async function (e) {
@@ -127,8 +197,17 @@ document.addEventListener("DOMContentLoaded", function () {
 
       const tipo = document.getElementById("tipo").value;
       const subtipo = document.getElementById("subtipo").value;
-      const sabor = document.getElementById("sabor").value.trim();
+      const saborSelect = document.getElementById("sabor-select").value;
+      const saborNuevo = document.getElementById("sabor-nuevo").value.trim();
       const cantidad = parseInt(document.getElementById("cantidad").value);
+
+      // Determinar el sabor final
+      let sabor;
+      if (saborSelect === "__nuevo__") {
+        sabor = saborNuevo;
+      } else {
+        sabor = saborSelect;
+      }
 
       if (!sabor || cantidad <= 0) {
         showAlert("Por favor completa todos los campos correctamente", "error");
@@ -152,6 +231,9 @@ document.addEventListener("DOMContentLoaded", function () {
         if (data.success) {
           showAlert(data.message || "Helado creado exitosamente", "success");
           this.reset();
+          // Limpiar campos ocultos
+          document.getElementById("subtipo-group").style.display = "none";
+          document.getElementById("sabor-nuevo-group").style.display = "none";
         } else {
           showAlert(data.error || "Error al crear helado", "error");
         }
