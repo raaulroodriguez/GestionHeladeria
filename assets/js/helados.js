@@ -131,12 +131,10 @@ async function cargarSabores(tipo) {
     selectSabor.innerHTML = '<option value="">Seleccionar sabor...</option>';
 
     if (data.success && data.data.length > 0) {
-      data.data.forEach((sabor) => {
+      data.data.forEach(p => {
         const option = document.createElement("option");
-        option.value = sabor;
-        option.textContent = `${getTipoNombre(p.tipo)} - ${p.sabor} (Stock: ${
-          p.cantidad
-        })`;
+        option.value = p.sabor;
+        option.textContent = `${getTipoNombre(p.tipo)} - ${p.sabor} (Stock: ${p.cantidad})`;
         selectSabor.appendChild(option);
       });
     }
@@ -146,6 +144,7 @@ async function cargarSabores(tipo) {
     optionNuevo.value = "__nuevo__";
     optionNuevo.textContent = "➕ Crear nuevo sabor...";
     selectSabor.appendChild(optionNuevo);
+
   } catch (error) {
     console.error("Error al cargar sabores:", error);
     selectSabor.innerHTML = '<option value="">Error al cargar sabores</option>';

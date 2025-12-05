@@ -6,7 +6,7 @@ export default async function handler(req, res) {
   try {
     const { tipo } = req.query;
 
-    let query = "SELECT DISTINCT sabor FROM inventario";
+    let query = "SELECT tipo, sabor, cantidad FROM inventario";
     let params = [];
 
     if (tipo) {
@@ -20,7 +20,7 @@ export default async function handler(req, res) {
 
     res.status(200).json({
       success: true,
-      data: rows.map(row => row.sabor)
+      data: rows
     });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
